@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AUTOHOME INTELLIGENCE - Monitoreo Domótico</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Roboto', sans-serif; }
+        
+        /* Animación y Sombra para las Tarjetas */
+        .sensor-card {
+            transition: all 0.3s ease;
+        }
+        .sensor-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,255,255,0.1); /* Sombra turquesa sutil */
+        }
+        
+        /* Termómetro CSS/HTML de Sensores Individuales */
+        .thermometer {
+            width: 30px;
+            height: 100px;
+            border: 3px solid #6b7280; /* gray-500 */
+            border-radius: 9999px;
+            position: relative;
+            overflow: hidden;
+            background-color: #374151; /* gray-700 */
+        }
+        .mercury {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            transition: height 0.5s ease-out, background-color 0.5s ease-out;
+            border-radius: 9999px;
+        }
+        .bulb {
+            width: 45px;
+            height: 45px;
+            background-color: #ef4444; /* red-500 */
+            border-radius: 50%;
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 3px solid #4b5563; /* gray-600 */
+        }
+
+        /* --- NUEVO INDICADOR DE PROMEDIO LLAMATIVO (SEGMENTED GAUGE) --- */
+        .segmented-gauge {
+            height: 20px;
+            border-radius: 9999px;
+            display: flex;
+            position: relative;
+            overflow: hidden;
+        }
+        .gauge-segment {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #1f2937; /* gray-800 */
+            font-size: 0.75rem; /* text-xs */
+            font-weight: bold;
+        }
+
+        /* Indicador de posición (Círculo) */
+        .indicator-dot {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px; /* Tamaño del círculo */
+            height: 16px;
+            border-radius: 50%;
+            border: 3px solid #1f2937; /* Borde oscuro para contraste */
+            transition: left 0.5s ease-out, background-color 0.5s ease-out;
+            z-index: 10;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
+
+    <header class="bg-gray-800 text-white shadow-xl border-b-4 border-teal-400">
+        <div class="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-4">
+                <div class="bg-teal-400 p-3 rounded-xl">
+                    <i data-lucide="cpu" class="w-8 h-8 text-gray-900"></i>
+                </div>
+                <div>
+                    <h1 class="text-3xl font-extrabold tracking-wider text-teal-300">AUTOHOME INTELLIGENCE</h1>
+                    <p class="text-sm text-teal-500 font-semibold tracking-widest">AUTOMATIZACIÓN E INSTRUMENTACIÓN</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3 bg-gray-900/50 px-4 py-2 rounded-lg border border-teal-400/30">
+                <div class="relative flex h-3 w-3">
+                  <span id="pingDot" class="ping-dot absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75 hidden"></span>
+                  <span id="staticDot" class="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
+                </div>
+                <span id="statusText" class="text-sm font-mono text-yellow-300">Desconectado</span>
+                <i data-lucide="clock" class="w-4 h-4 text-gray-400 ml-3"></i>
+                <span id="timeDisplay" class="text-sm font-mono text-white font-bold">--:--:--</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="bg-gray-700 border-b border-gray-600 shadow-lg">
+        <div class="container mx-auto px-4 py-2 flex flex-wrap justify-between items-center text-sm text-gray-300">
+            <div class="flex items-center gap-2">
+                <i data-lucide="users" class="w-4 h-4 text-purple-400"></i>
+                <span class="font-medium">Desarrolladores: <span class="text-teal-400 font-bold">Christopher Nacimba, Willian Pallo</span></span>
+            </div>
+            <div class="flex gap-4 font-mono text-gray-400">
+                <i data-lucide="calendar" class="w-4 h-4 text-purple-400"></i>
+                <span id="dateDisplay">--/--/----</span>
+            </div>
+        </div>
+    </div>
+
+    <main class="flex-grow container mx-auto px-4 py-8">
+        
+        <div class="text-center mb-10">
+            <h2 class="text-4xl font-extrabold text-teal-400 mb-1">Monitoreo de Casa Domótica</h2>
+            <p class="text-gray-400 font-light">SISTEMA INTELIGENTE DE TEMPERATURA</p>
+        </div>
+
+        <div class="bg-gray-800 rounded-xl shadow-2xl p-6 mb-12 border-l-4 border-purple-500">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-6">
+                    <i data-lucide="cloud-sun" class="w-10 h-10 text-yellow-400"></i>
+                    <div>
+                        <p class="text-xl font-semibold text-gray-300 mb-1">Temperatura Promedio del Hogar</p>
+                        <div class="flex items-end">
+                            <span id="avgTempDisplay" class="text-6xl font-extrabold text-purple-400">--</span>
+                            <span class="text-3xl font-light text-purple-600 ml-2">°C</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="w-1/2 min-w-[300px] p-2 bg-gray-900 rounded-lg">
+                    <p class="text-xs text-gray-400 mb-3 font-mono text-center">Niveles: Bajo (15°C) | Medio (22°C) | Alto (35°C)</p>
+                    
+                    <div class="segmented-gauge">
+                        <div class="gauge-segment bg-blue-500 rounded-l-full w-[35%]">
+                            BAJO
+                        </div>
+                        <div class="gauge-segment bg-yellow-500 w-[35%]">
+                            MEDIO
+                        </div>
+                        <div class="gauge-segment bg-red-500 rounded-r-full w-[30%]">
+                            ALTO
+                        </div>
+                        
+                        <div id="avgIndicatorDot" class="indicator-dot bg-white" style="left: 0%;"></div>
+                    </div>
+                </div>
+                </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+
+            <div class="sensor-card bg-gray-800 rounded-xl overflow-hidden shadow-lg border-t-4 border-emerald-500">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-emerald-400">PATIO</h3>
+                        <i data-lucide="tree-pine" class="w-6 h-6 text-emerald-500"></i>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <div class="text-center">
+                            <i data-lucide="thermometer" class="w-8 h-8 text-gray-500 mb-2"></i>
+                            <div class="text-5xl font-extrabold text-gray-200" id="val1">--</div>
+                            <div class="text-gray-400 mt-1 text-sm">°C</div>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <div class="thermometer">
+                                <div id="mercury1" class="mercury"></div>
+                            </div>
+                            <div class="bulb" id="bulb1"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sensor-card bg-gray-800 rounded-xl overflow-hidden shadow-lg border-t-4 border-purple-500">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-purple-400">SALA</h3>
+                        <i data-lucide="couch" class="w-6 h-6 text-purple-500"></i>
+                    </div>
+                    <div class="flex items-center justify-between">
+                         <div class="text-center">
+                            <i data-lucide="thermometer" class="w-8 h-8 text-gray-500 mb-2"></i>
+                            <div class="text-5xl font-extrabold text-gray-200" id="val2">--</div>
+                            <div class="text-gray-400 mt-1 text-sm">°C</div>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <div class="thermometer">
+                                <div id="mercury2" class="mercury"></div>
+                            </div>
+                            <div class="bulb" id="bulb2"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sensor-card bg-gray-800 rounded-xl overflow-hidden shadow-lg border-t-4 border-yellow-500">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-yellow-400">GARAGE</h3>
+                        <i data-lucide="car-front" class="w-6 h-6 text-yellow-500"></i>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <div class="text-center">
+                            <i data-lucide="thermometer" class="w-8 h-8 text-gray-500 mb-2"></i>
+                            <div class="text-5xl font-extrabold text-gray-200" id="val3">--</div>
+                            <div class="text-gray-400 mt-1 text-sm">°C</div>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <div class="thermometer">
+                                <div id="mercury3" class="mercury"></div>
+                            </div>
+                            <div class="bulb" id="bulb3"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sensor-card bg-gray-800 rounded-xl overflow-hidden shadow-lg border-t-4 border-red-500">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-red-400">COCINA</h3>
+                        <i data-lucide="cooker" class="w-6 h-6 text-red-500"></i>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <div class="text-center">
+                            <i data-lucide="thermometer" class="w-8 h-8 text-gray-500 mb-2"></i>
+                            <div class="text-5xl font-extrabold text-gray-200" id="val4">--</div>
+                            <div class="text-gray-400 mt-1 text-sm">°C</div>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <div class="thermometer">
+                                <div id="mercury4" class="mercury"></div>
+                            </div>
+                            <div class="bulb" id="bulb4"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="mt-16 flex justify-center">
+            <button id="connectBtn" onclick="toggleConnection()" class="bg-teal-500 hover:bg-teal-400 text-gray-900 font-extrabold py-4 px-10 rounded-full shadow-2xl flex items-center gap-3 transition-all hover:scale-[1.02] active:scale-95">
+                <i data-lucide="bluetooth" class="w-6 h-6"></i>
+                <span>CONECTAR DISPOSITIVO BLUETOOTH</span>
+            </button>
+        </div>
+
+    </main>
+
+    <footer class="bg-gray-950 text-gray-500 py-6 text-center text-xs border-t-4 border-teal-400">
+        <p>© 2025 Instituto Superior Tecnológico Vida Nueva - Desarrollado para Automatización</p>
+    </footer>
+
+    <script>
+        // Inicializar iconos
+        lucide.createIcons();
+
+        // --- 1. RELOJ Y FECHA AUTOMÁTICO ---
+        function updateClock() {
+            const now = new Date();
+            // Fecha
+            const optionsDate = { year: 'numeric', month: 'short', day: 'numeric' };
+            document.getElementById('dateDisplay').textContent = now.toLocaleDateString('es-EC', optionsDate).toUpperCase();
+            // Hora
+            document.getElementById('timeDisplay').textContent = now.toLocaleTimeString('es-EC');
+        }
+        setInterval(updateClock, 1000);
+        updateClock(); 
+
+        // --- 2. LÓGICA BLUETOOTH (Web Bluetooth API) ---
+        
+        // UUIDs (Deben coincidir con el ESP32)
+        const serviceUuid = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+        const characteristicUuid = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+
+        let bluetoothDevice;
+        let bleCharacteristic;
+
+        // Referencias UI
+        const connectBtn = document.getElementById('connectBtn');
+        const statusText = document.getElementById('statusText');
+        const pingDot = document.getElementById('pingDot');
+        const staticDot = document.getElementById('staticDot');
+        
+        // Valores de sensores
+        const val1 = document.getElementById('val1');
+        const val2 = document.getElementById('val2');
+        const val3 = document.getElementById('val3');
+        const val4 = document.getElementById('val4');
+        
+        // Termómetros (Mercurio y Bulbo)
+        const mercury = {
+            s1: document.getElementById('mercury1'),
+            s2: document.getElementById('mercury2'),
+            s3: document.getElementById('mercury3'),
+            s4: document.getElementById('mercury4')
+        };
+        const bulb = {
+            s1: document.getElementById('bulb1'),
+            s2: document.getElementById('bulb2'),
+            s3: document.getElementById('bulb3'),
+            s4: document.getElementById('bulb4')
+        };
+
+        // Promedio y Nuevo Indicador
+        const avgTempDisplay = document.getElementById('avgTempDisplay');
+        const avgIndicatorDot = document.getElementById('avgIndicatorDot');
+
+        async function toggleConnection() {
+            if (bluetoothDevice && bluetoothDevice.gatt.connected) {
+                disconnect();
+            } else {
+                connect();
+            }
+        }
+
+        async function connect() {
+            try {
+                // UI Cargando
+                connectBtn.innerHTML = '<span class="animate-spin text-xl">⏳</span> BUSCANDO...';
+                connectBtn.classList.remove('bg-teal-500', 'hover:bg-teal-400');
+                connectBtn.classList.add('bg-gray-500');
+
+                // 1. Escanear
+                console.log('Buscando dispositivo...');
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'TUVN_Termometros' }], 
+                    optionalServices: [serviceUuid]
+                });
+
+                bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+                // 2. Conectar
+                const server = await bluetoothDevice.gatt.connect();
+                const service = await server.getPrimaryService(serviceUuid);
+                bleCharacteristic = await service.getCharacteristic(characteristicUuid);
+
+                // 3. Activar Notificaciones
+                await bleCharacteristic.startNotifications();
+                bleCharacteristic.addEventListener('characteristicvaluechanged', handleData);
+
+                console.log('¡Conectado!');
+                updateUIConnected();
+
+            } catch (error) {
+                console.log('Error de conexión:', error);
+                updateUIDisconnected();
+            }
+        }
+
+        function disconnect() {
+            if (bluetoothDevice && bluetoothDevice.gatt.connected) {
+                bluetoothDevice.gatt.disconnect();
+            }
+        }
+
+        function onDisconnected() {
+            console.log('Desconectado.');
+            updateUIDisconnected();
+        }
+        
+        // Función de utilería para actualizar el termómetro visual (Sensores individuales)
+        function updateThermometer(sensorId, temperature) {
+            const minTemp = 10;
+            const maxTemp = 40;
+            const tempRange = maxTemp - minTemp;
+
+            let percentage;
+            if (temperature <= minTemp) {
+                percentage = 0;
+            } else if (temperature >= maxTemp) {
+                percentage = 100;
+            } else {
+                percentage = ((temperature - minTemp) / tempRange) * 100;
+            }
+
+            const mercuryElement = mercury[sensorId];
+            const bulbElement = bulb[sensorId];
+
+            if (mercuryElement && bulbElement) {
+                mercuryElement.style.height = `${percentage}%`;
+                
+                let colorClass;
+                if (temperature < 20) {
+                    colorClass = 'bg-blue-500'; // Frío/Normal
+                } else if (temperature >= 20 && temperature < 28) {
+                    colorClass = 'bg-yellow-500'; // Cálido
+                } else {
+                    colorClass = 'bg-red-500'; // Caliente
+                }
+                
+                // Limpiar y aplicar clases
+                mercuryElement.className = 'mercury ' + colorClass;
+                bulbElement.className = 'bulb ' + colorClass;
+            }
+        }
+        
+        // --- 3. PROCESAMIENTO DE DATOS ---
+        function handleData(event) {
+            const value = event.target.value;
+            const decoder = new TextDecoder('utf-8');
+            const jsonString = decoder.decode(value);
+
+            console.log("Dato recibido:", jsonString); 
+
+            try {
+                const data = JSON.parse(jsonString);
+
+                let sum = 0;
+                let count = 0;
+
+                const sensors = [
+                    { id: 's1', element: val1 }, 
+                    { id: 's2', element: val2 }, 
+                    { id: 's3', element: val3 }, 
+                    { id: 's4', element: val4 }
+                ];
+
+                sensors.forEach(sensor => {
+                    const temp = data[sensor.id];
+                    if (temp !== undefined) {
+                        const tempValue = parseFloat(temp.toFixed(1));
+                        sensor.element.innerText = tempValue;
+                        updateThermometer(sensor.id, tempValue); 
+                        sum += tempValue;
+                        count++;
+                    }
+                });
+
+                // Calcular y mostrar temperatura promedio
+                if (count > 0) {
+                    const avgTemp = sum / count;
+                    avgTempDisplay.innerText = avgTemp.toFixed(1);
+                    updateAvgIndicator(avgTemp); // Usar la nueva función
+                }
+
+                // Efecto visual de "latido"
+                pingDot.classList.remove('hidden');
+                setTimeout(() => {
+                    pingDot.classList.add('hidden');
+                }, 500);
+
+            } catch (e) {
+                console.error("Error al leer JSON:", e);
+            }
+        }
+
+        // FUNCIÓN MODIFICADA: Actualizar el NUEVO indicador gráfico de temperatura promedio
+        function updateAvgIndicator(temperature) {
+            const minTemp = 15; // Mínimo absoluto (0% del indicador)
+            const maxTemp = 35; // Máximo absoluto (100% del indicador)
+            const range = maxTemp - minTemp;
+
+            let percentage;
+
+            if (temperature <= minTemp) {
+                percentage = 0;
+            } else if (temperature >= maxTemp) {
+                // Se resta el 1.5% del 100% para que el punto no se salga completamente del contenedor
+                percentage = 98.5; 
+            } else {
+                percentage = ((temperature - minTemp) / range) * 100;
+                // Ajuste para centrar el punto (aproximadamente -1.5% del total para el centro del punto)
+                percentage = Math.max(0, percentage - 1.5); 
+            }
+
+            avgIndicatorDot.style.left = `${percentage}%`;
+
+            // Opcional: Cambiar el color del punto indicador (Dot)
+            avgIndicatorDot.classList.remove('bg-blue-300', 'bg-yellow-300', 'bg-red-300');
+            if (temperature < 22) { // Zona Baja
+                avgIndicatorDot.classList.add('bg-blue-300'); 
+            } else if (temperature >= 22 && temperature < 28) { // Zona Media
+                avgIndicatorDot.classList.add('bg-yellow-300'); 
+            } else { // Zona Alta
+                avgIndicatorDot.classList.add('bg-red-300'); 
+            }
+        }
+
+
+        // --- FUNCIONES UI DE CONEXIÓN ---
+        function updateUIConnected() {
+            connectBtn.innerHTML = 'DESCONECTAR SISTEMA';
+            connectBtn.classList.remove('bg-teal-500', 'hover:bg-teal-400', 'bg-gray-500');
+            connectBtn.classList.add('bg-red-600', 'hover:bg-red-500', 'text-white');
+            
+            statusText.innerText = "CONECTADO";
+            statusText.classList.replace('text-yellow-300', 'text-emerald-400');
+            staticDot.classList.replace('bg-yellow-500', 'bg-emerald-500');
+        }
+
+        function updateUIDisconnected() {
+            connectBtn.innerHTML = '<i data-lucide="bluetooth" class="w-6 h-6"></i> CONECTAR DISPOSITIVO BLUETOOTH';
+            lucide.createIcons(); // Recargar icono
+            connectBtn.classList.add('bg-teal-500', 'hover:bg-teal-400', 'text-gray-900');
+            connectBtn.classList.remove('bg-red-600', 'hover:bg-red-500', 'bg-gray-500', 'text-white');
+
+            statusText.innerText = "DESCONECTADO";
+            statusText.classList.replace('text-emerald-400', 'text-yellow-300');
+            staticDot.classList.replace('bg-emerald-500', 'bg-yellow-500');
+            pingDot.classList.add('hidden');
+
+            // Resetear todos los valores
+            val1.innerText = val2.innerText = val3.innerText = val4.innerText = "--";
+            avgTempDisplay.innerText = "--";
+            updateAvgIndicator(0); // Resetear el nuevo indicador
+
+            // Resetear termómetros visuales
+            updateThermometer('s1', 0);
+            updateThermometer('s2', 0);
+            updateThermometer('s3', 0);
+            updateThermometer('s4', 0);
+        }
+    </script>
+</body>
+</html>
